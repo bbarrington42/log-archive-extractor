@@ -34,8 +34,6 @@ class S3ObjectIterator(s3: AmazonS3, objectListing: ObjectListing) extends Itera
     private val summaries = objectListing.getObjectSummaries.asScala
     private val bucketName = objectListing.getBucketName
 
-    println(s"Got ${summaries.length} summaries...")
-
     override def hasNext: Boolean = index < objectListing.getObjectSummaries.size
 
     override def next(): S3Object = {
@@ -63,7 +61,7 @@ object S3ObjectIterator {
 
 object Main {
   import S3ObjectIterator._
-  
+
   def main(args: Array[String]): Unit = {
 
     val credentialsProvider = new ProfileCredentialsProvider("cda")
@@ -78,13 +76,5 @@ object Main {
     val iter = new S3ObjectIterator(s3, objectListing)
 
     iter.foreach(s3Object => println(getContentAsString(s3Object)))
-//
-//    var i = 1
-//    while (iter.hasNext) {
-//      val next = iter.next()
-//      val r = getContentAsString(next)
-//
-//      println(r)
-//    }
   }
 }
