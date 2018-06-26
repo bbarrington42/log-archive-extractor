@@ -96,31 +96,3 @@ object S3ObjectIterator {
 
 }
 
-object Main {
-
-  import S3ObjectIterator._
-
-  def main(args: Array[String]): Unit = {
-
-    val credentialsProvider = new ProfileCredentialsProvider("cda")
-
-    val s3ClientBuilder = AmazonS3ClientBuilder.standard().withCredentials(credentialsProvider)
-
-    val s3 = s3ClientBuilder.build()
-
-    // For now, just retrieve all logs in the 'test' environment
-    val objectListing = s3.listObjects("cda_logs", "test")
-
-    val iter = new S3ObjectIterator(s3, objectListing)
-
-    var i = 0
-
-    iter.foreach(s3Object => {
-      val s = getContentAsString(s3Object)
-      val ss = asJsObjects(s)
-      println(ss)
-      i += ss.length
-      println(i)
-    })
-  }
-}
