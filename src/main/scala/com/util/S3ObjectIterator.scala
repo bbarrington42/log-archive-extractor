@@ -1,12 +1,13 @@
 package com.util
 
 import java.io.{BufferedReader, InputStreamReader}
-import java.util.function.BinaryOperator
+import java.util.stream.Collectors
 import java.util.zip.GZIPInputStream
 
 import com.amazonaws.auth.profile.ProfileCredentialsProvider
 import com.amazonaws.services.s3.model.{ObjectListing, S3Object}
 import com.amazonaws.services.s3.{AmazonS3, AmazonS3ClientBuilder}
+import play.api.libs.json.{JsObject, Json}
 
 import scala.collection.JavaConverters._
 
@@ -49,43 +50,48 @@ class S3ObjectIterator(s3: AmazonS3, objectListing: ObjectListing) extends Itera
 object S3ObjectIterator {
   // Retrieve object as a String and close the underlying HTTP connection.
   def getContentAsString(s3Object: S3Object): String = try {
-    val op = new BinaryOperator[String] {
-      override def apply(t: String, u: String): String = t + u
-    }
     val br = new BufferedReader(new InputStreamReader(new GZIPInputStream(s3Object.getObjectContent)))
 
     // Concatenate multiple lines, if any.
-    br.lines().reduce("", op)
+    br.lines.collect(Collectors.joining)
 
   } finally {
     s3Object.close()
   }
 
-  def extract(s: String, start: Int = 0): List[String] = {
-    println("Entering extract...")
-    println(s"start: $start")
 
-    val chars = s.toList
+  val messageType = """\{\"messageType\"""".r
 
-    // Return the index of the character AFTER the matching closing brace
-    def findClosingBrace(index: Int, count: Int = 0): Int = {
-      println(s"Entering findClosingBrace..., index=$index, count=$count")
-      if (index >= chars.length) chars.length else chars(index) match {
-        case '{' => findClosingBrace(index + 1, count + 1)
-        case '}' => if (count == 1) index + 1 else findClosingBrace(index + 1, count - 1)
-        case _ => findClosingBrace(index + 1, count)
+  def asJsObjects(s: String): List[JsObject] = {
+
+    // Each sub string should be a valid JSON object
+    def subStrings(start: Int, rest: List[Int]): List[String] = rest match {
+      case Nil => List(s.substring(start, s.length))
+      case x :: xs => s.substring(start, x) :: subStrings(x, xs)
+    }
+
+    // Transform each sub string into a JsObject
+    def jsObjects(input: List[String]): List[JsObject] = input match {
+      case Nil => Nil
+      case x :: xs => try {
+        Json.parse(x).as[JsObject] :: jsObjects(xs)
+      } catch {
+        case t: Throwable =>
+          println(t)
+          jsObjects(xs)
       }
     }
 
-    val rv = if (start >= s.length) Nil else {
-      val end = findClosingBrace(start)
-      println(s"start: $start, end: $end")
-      s.substring(start, end) :: extract(s, end)
+    val matches = messageType.findAllMatchIn(s).toList
+
+    if (matches.isEmpty) Nil else {
+      // Get the starting index of each Match
+      val head :: tail = matches.map(_.start)
+      // Extract the sub-strings
+      val strings = subStrings(head, tail)
+      // Now try to parse each string into a JsObject
+      jsObjects(strings)
     }
-
-    println("Exiting extract...")
-
-    rv
   }
 
 }
@@ -110,9 +116,8 @@ object Main {
     var i = 0
 
     iter.foreach(s3Object => {
-      // todo Consider not retrieving S3Object. Instead just use the getContentAsString method on the S3 client.
       val s = getContentAsString(s3Object)
-      val ss = extract(s)
+      val ss = asJsObjects(s)
       println(ss)
       i += ss.length
       println(i)

@@ -11,3 +11,5 @@ libraryDependencies += "com.amazonaws" % "aws-java-sdk-s3" % "1.11.353"
 libraryDependencies += "org.scalaz" %% "scalaz-core" % "7.2.24"
 // https://mvnrepository.com/artifact/org.scalaz/scalaz-effect
 libraryDependencies += "org.scalaz" %% "scalaz-effect" % "7.2.24"
+// https://mvnrepository.com/artifact/com.typesafe.play/play-json
+libraryDependencies += "com.typesafe.play" %% "play-json" % "2.6.9"
