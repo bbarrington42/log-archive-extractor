@@ -53,13 +53,45 @@ object S3ObjectIterator {
       override def apply(t: String, u: String): String = t + u
     }
     val br = new BufferedReader(new InputStreamReader(new GZIPInputStream(s3Object.getObjectContent)))
+
+    // Concatenate multiple lines, if any.
     br.lines().reduce("", op)
+
   } finally {
     s3Object.close()
   }
+
+  def extract(s: String, start: Int = 0): List[String] = {
+    println("Entering extract...")
+    println(s"start: $start")
+
+    val chars = s.toList
+
+    // Return the index of the character AFTER the matching closing brace
+    def findClosingBrace(index: Int, count: Int = 0): Int = {
+      println(s"Entering findClosingBrace..., index=$index, count=$count")
+      if (index >= chars.length) chars.length else chars(index) match {
+        case '{' => findClosingBrace(index + 1, count + 1)
+        case '}' => if (count == 1) index + 1 else findClosingBrace(index + 1, count - 1)
+        case _ => findClosingBrace(index + 1, count)
+      }
+    }
+
+    val rv = if (start >= s.length) Nil else {
+      val end = findClosingBrace(start)
+      println(s"start: $start, end: $end")
+      s.substring(start, end) :: extract(s, end)
+    }
+
+    println("Exiting extract...")
+
+    rv
+  }
+
 }
 
 object Main {
+
   import S3ObjectIterator._
 
   def main(args: Array[String]): Unit = {
@@ -75,6 +107,15 @@ object Main {
 
     val iter = new S3ObjectIterator(s3, objectListing)
 
-    iter.foreach(s3Object => println(getContentAsString(s3Object)))
+    var i = 0
+
+    iter.foreach(s3Object => {
+      // todo Consider not retrieving S3Object. Instead just use the getContentAsString method on the S3 client.
+      val s = getContentAsString(s3Object)
+      val ss = extract(s)
+      println(ss)
+      i += ss.length
+      println(i)
+    })
   }
 }
