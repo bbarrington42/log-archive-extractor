@@ -25,7 +25,13 @@ object Main {
 
     iter.foreach(s3Object => {
       val s = getContentAsString(s3Object)
-      val jsObjects = asJsObjects(s).filter(jsObject => isDataMessage(jsObject) && isLogType(jsObject, ConsumerLog))
+      val jsObjects = asJsObjects(s).filter(jsObject => {
+        val p = for {
+          b1 <- isDataMessage(jsObject)
+          b2 <- isConsumerLog(jsObject)
+        } yield b1 && b2
+        p.getOrElse(false)
+      })
 
       println(jsObjects)
       i += jsObjects.length
