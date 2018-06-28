@@ -20,15 +20,20 @@ object Filtering {
     override val prefix: String = "dispenser"
   }
 
-  sealed trait MessageType { val text: String }
+  sealed trait MessageType {
+    val text: String
+  }
+
   case object DataMessage extends MessageType {
     override val text: String = "DATA_MESSAGE"
   }
+
   case object ControlMessage extends MessageType {
     override val text: String = "CONTROL_MESSAGE"
   }
 
   def isDataMessage(jsObject: JsObject): Option[Boolean] = matchMessageType(jsObject, DataMessage)
+
   def isControlMessage(jsObject: JsObject): Option[Boolean] = matchMessageType(jsObject, ControlMessage)
 
   def matchMessageType(jsObject: JsObject, messageType: MessageType): Option[Boolean] = for {
@@ -37,7 +42,9 @@ object Filtering {
   } yield msgType == messageType.text
 
   def isAccessLog(jsObject: JsObject): Option[Boolean] = matchLogType(jsObject, AccessLog)
+
   def isConsumerLog(jsObject: JsObject): Option[Boolean] = matchLogType(jsObject, ConsumerLog)
+
   def isDispenserLog(jsObject: JsObject): Option[Boolean] = matchLogType(jsObject, DispenserLog)
 
   def matchLogType(jsObject: JsObject, logType: LogType): Option[Boolean] = for {
