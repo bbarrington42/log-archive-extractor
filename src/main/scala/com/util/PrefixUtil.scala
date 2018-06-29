@@ -1,60 +1,58 @@
 package com.util
 
-import com.amazonaws.auth.profile.ProfileCredentialsProvider
-import com.amazonaws.services.s3.{AmazonS3, AmazonS3ClientBuilder}
-import com.amazonaws.services.s3.model.{ListObjectsRequest, ObjectListing}
-
-import scala.collection.JavaConverters._
+import org.joda.time.{DateTime, DateTimeZone}
 
 /*
-  Utility to obtain all common prefixes within a range.
+  Utility to generate date based bucket keys for log archives. Keys are of the format:
+  <year>/<month>/<day>/<hour>, i.e. 2018/06/29/13
  */
 
 
 object PrefixUtil {
+  implicit def mkOps[A](x: A)(implicit ord: math.Ordering[A]): ord.Ops =
+    ord.mkOrderingOps(x)
 
-  // Get all common prefixes for a given bucket and key.
-  def getPrefixes(s3: AmazonS3, bucket: String, key: String): List[String] = {
-    def prefixes(objectListing: ObjectListing): List[String] =
-      objectListing.getCommonPrefixes.asScala.toList ++
-        (if (objectListing.isTruncated) prefixes(s3.listNextBatchOfObjects(objectListing)) else Nil)
+  def months: List[Int] = (1 to 12).toList
 
-    val request = new ListObjectsRequest().withBucketName(bucket).withPrefix(key).withDelimiter("/")
-
-    val rv = prefixes(s3.listObjects(request))
-
-    println(s"getPrefixes: $rv for prefix $key")
-
-    rv
+  def days(year: Int, month: Int): List[Int] = {
+    val dateTime = new DateTime().withYear(year).withMonthOfYear(month)
+    val range = 1 to dateTime.dayOfMonth().getMaximumValue
+    range.toList
   }
 
+  def hours: List[Int] = (0 to 23).toList
 
-  // Recurse down the hierarchy of prefixes.
-  def allPrefixes(s3: AmazonS3, bucketName: String, prefix: String): List[String] = {
+  // Generate all the Int values for the prefixes for a range of years
+  def prefixValues(years: List[Int]): List[(Int, Int, Int, Int)] = for {
+    y <- years
+    m <- months
+    d <- days(y, m)
+    h <- hours
+  } yield (y, m, d, h)
 
-    def fanOut(prefixes: List[String]): List[String] = prefixes match {
-      case Nil => Nil
-      case x :: xs => fanOut(getPrefixes(s3, bucketName,x)) ++ fanOut(xs)
-    }
-
-    fanOut(getPrefixes(s3, bucketName, prefix))
+  // Generate prefix values in the given range inclusive
+  def prefixValues(start: DateTime, end: DateTime): List[String] = {
+    // First put the range in UTC
+    val sd = start.withZone(DateTimeZone.UTC)
+    val ed = end.withZone(DateTimeZone.UTC)
+    val s = (sd.getYear, sd.getMonthOfYear, sd.getDayOfMonth, sd.getHourOfDay)
+    val e = (ed.getYear, ed.getMonthOfYear, ed.getDayOfMonth, ed.getHourOfDay)
+    // Filter out values not in the range
+    val tuples = prefixValues((sd.getYear to ed.getYear).toList).filter(p => p >= s && p <= e)
+    // Convert to Strings
+    tuples.map { case (y, m, d, h) => f"$y/$m%02d/$d%02d/$h%02d" }
   }
 }
 
 
 object TestPrefixUtil {
+
   import PrefixUtil._
 
   def main(args: Array[String]): Unit = {
+    val now = DateTime.now(DateTimeZone.UTC)
+    println(now)
 
-    val credentialsProvider = new ProfileCredentialsProvider("cda")
-
-    val s3ClientBuilder = AmazonS3ClientBuilder.standard().withCredentials(credentialsProvider)
-
-    val s3 = s3ClientBuilder.build()
-
-    val result = allPrefixes(s3, "cda_logs", "prod-green/")
-
-    println(result)
+    println(prefixValues(now, now.plusYears(1)))
   }
 }
