@@ -31,7 +31,7 @@ object PrefixUtil {
   } yield (y, m, d, h)
 
   // Generate prefix values in the given range inclusive
-  def prefixValues(start: DateTime, end: DateTime): List[String] = {
+  def prefixes(start: DateTime, end: DateTime): List[String] = {
     // First put the range in UTC
     val sd = start.withZone(DateTimeZone.UTC)
     val ed = end.withZone(DateTimeZone.UTC)
@@ -40,19 +40,6 @@ object PrefixUtil {
     // Filter out values not in the range
     val tuples = prefixValues((sd.getYear to ed.getYear).toList).filter(p => p >= s && p <= e)
     // Convert to Strings
-    tuples.map { case (y, m, d, h) => f"$y/$m%02d/$d%02d/$h%02d" }
-  }
-}
-
-
-object TestPrefixUtil {
-
-  import PrefixUtil._
-
-  def main(args: Array[String]): Unit = {
-    val now = DateTime.now(DateTimeZone.UTC)
-    println(now)
-
-    println(prefixValues(now, now.plusYears(1)))
+    tuples.map { case (y, m, d, h) => f"/$y/$m%02d/$d%02d/$h%02d/" }
   }
 }

@@ -28,7 +28,7 @@ class S3ObjectIterator(s3: AmazonS3, objectListing: ObjectListing) extends Itera
 
   override def next(): S3Object = pageIterator.next()
 
-  class PageIterator(val objectListing: ObjectListing) extends Iterator[S3Object] {
+  private class PageIterator(val objectListing: ObjectListing) extends Iterator[S3Object] {
 
     private var index = 0
 
