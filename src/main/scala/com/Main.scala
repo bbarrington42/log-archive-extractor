@@ -13,9 +13,9 @@ object Main {
 
   def printlogs(s3: AmazonS3, env: String, start: DateTime, end: DateTime): Unit = {
     try {
-      val ps = prefixes(start, end)
+      val ps = prefixes(env, start, end)
       ps.foreach(p => {
-        val s3Iter = S3ObjectIterator(s3, "cda_logs", env + p)
+        val s3Iter = S3ObjectIterator(s3, "cda_logs", p)
         while (s3Iter.hasNext) {
           val s = getContentAsString(s3Iter.next())
           val jsObjects = asJsObjects(s).filter(jsObject => {

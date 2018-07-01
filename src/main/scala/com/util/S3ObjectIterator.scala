@@ -34,7 +34,11 @@ class S3ObjectIterator(s3: AmazonS3, objectListing: ObjectListing) extends Itera
     private val summaries = objectListing.getObjectSummaries.asScala
     private val bucketName = objectListing.getBucketName
 
-    override def hasNext: Boolean = index < objectListing.getObjectSummaries.size
+    val prefix = objectListing.getPrefix
+    val sz = objectListing.getObjectSummaries.size
+    println(s"$sz objects @ $prefix")
+
+    override def hasNext: Boolean = index < sz
 
     override def next(): S3Object = {
       val i = index
