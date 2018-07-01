@@ -4,9 +4,8 @@ import java.io.{BufferedReader, InputStreamReader}
 import java.util.stream.Collectors
 import java.util.zip.GZIPInputStream
 
-import com.amazonaws.auth.profile.ProfileCredentialsProvider
+import com.amazonaws.services.s3.AmazonS3
 import com.amazonaws.services.s3.model.{ObjectListing, S3Object}
-import com.amazonaws.services.s3.{AmazonS3, AmazonS3ClientBuilder}
 import play.api.libs.json.{JsObject, Json}
 
 import scala.collection.JavaConverters._
@@ -48,6 +47,10 @@ class S3ObjectIterator(s3: AmazonS3, objectListing: ObjectListing) extends Itera
 }
 
 object S3ObjectIterator {
+
+  def apply(s3: AmazonS3, bucketName: String, prefix: String): S3ObjectIterator =
+    new S3ObjectIterator(s3, s3.listObjects(bucketName, prefix))
+
   // Retrieve object as a String and close the underlying HTTP connection.
   def getContentAsString(s3Object: S3Object): String = try {
     val br = new BufferedReader(new InputStreamReader(new GZIPInputStream(s3Object.getObjectContent)))
