@@ -28,15 +28,18 @@ import scalaz.{Apply, Failure, Success, ValidationNel, \/}
  */
 object CLI {
 
+  // Build the S3 client
   val credentialsProvider = new ProfileCredentialsProvider("cda")
 
   val s3ClientBuilder = AmazonS3ClientBuilder.standard().withCredentials(credentialsProvider)
 
   val s3 = s3ClientBuilder.build()
 
+
   val dateTimePattern = "YYYY/MM/dd/HH"
   val formatter = DateTimeFormat.forPattern(dateTimePattern).withZoneUTC()
 
+  // Individual validators...
   def validateDateTime(str: String): ValidationNel[String, DateTime] = \/.fromTryCatchNonFatal(
     DateTime.parse(str, formatter)
   ).leftMap(_ => s"Invalid date/time format: $str, valid format is $dateTimePattern ").validationNel
@@ -55,20 +58,22 @@ object CLI {
     file
   }.leftMap(_ => s"Invalid file path: $str").validationNel
 
-  import com.util.PrefixUtil._
 
-  def fileWriter(file: File)(f: Writer => Unit) = {
-    val writer = new BufferedWriter(new FileWriter(file))
-    try {
-      f(writer)
-    } catch {
-      case thr: Throwable => println(thr)
-    } finally {
-      writer.close()
+  // Does all the leg work once the parameters have been validated.
+  private def extractLogs(s3: AmazonS3, env: String, logType: LogType, start: DateTime, end: DateTime, destination: File): Unit = {
+
+    import com.util.PrefixUtil._
+
+    def fileWriter(file: File)(f: Writer => Unit) = {
+      val writer = new BufferedWriter(new FileWriter(file))
+      try {
+        f(writer)
+      } catch {
+        case thr: Throwable => println(thr)
+      } finally {
+        writer.close()
+      }
     }
-  }
-
-  def extractLogs(s3: AmazonS3, env: String, logType: LogType, start: DateTime, end: DateTime, destination: File): Unit = {
 
     fileWriter(destination)(
       writer => {
@@ -92,10 +97,13 @@ object CLI {
     )
   }
 
-  type VNel[T] = ValidationNel[String, T]
-  def invoke(env: String, logType: String, start: String, end: String, to: String): VNel[Unit] = {
-    Apply[VNel].apply5(validateEnvironment(env), validateLogType(logType),
-      validateDateTime(start), validateDateTime(end), validateDestinationFile(to))((a, b, c, d, e) =>{
+  type VNelT[T] = ValidationNel[String, T]
+
+  // Extract log content if parameters validate.
+  def invoke(env: String, logType: String, start: String, end: String, to: String): VNelT[Unit] = {
+    Apply[VNelT].apply5(validateEnvironment(env), validateLogType(logType),
+      validateDateTime(start), validateDateTime(end),
+      validateDestinationFile(to))((a, b, c, d, e) => {
       extractLogs(s3, a, b, c, d, e)
     })
   }
