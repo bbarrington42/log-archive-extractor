@@ -2,6 +2,8 @@ package com.util
 
 import org.joda.time.{DateTime, DateTimeZone}
 
+import scala.language.implicitConversions
+
 /*
   Utility to generate date based bucket keys for log archives. Keys are of the format:
   <year>/<month>/<day>/<hour>, i.e. 2018/06/29/13

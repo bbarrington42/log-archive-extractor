@@ -33,7 +33,7 @@ object Filtering {
   }
 
   val environments = Set("dev", "test", "prod-blue", "prod-green")
-  val logTypes = Set(ConsumerLog.prefix, AccessLog.prefix, DispenserLog.prefix)
+  val logTypes = Map("consumer" -> ConsumerLog, "access" -> AccessLog, "dispenser" -> DispenserLog)
 
   def isDataMessage(jsObject: JsObject): Option[Boolean] = matchMessageType(jsObject, DataMessage)
 
@@ -43,12 +43,6 @@ object Filtering {
     jsv <- jsObject.value.get("messageType")
     msgType <- jsv.asOpt[String]
   } yield msgType == messageType.text
-
-//  def isAccessLog(jsObject: JsObject): Option[Boolean] = matchLogType(jsObject, AccessLog)
-//
-//  def isConsumerLog(jsObject: JsObject): Option[Boolean] = matchLogType(jsObject, ConsumerLog)
-//
-//  def isDispenserLog(jsObject: JsObject): Option[Boolean] = matchLogType(jsObject, DispenserLog)
 
   def matchLogType(jsObject: JsObject, logType: LogType): Option[Boolean] = for {
     jsv <- jsObject.value.get("logGroup")

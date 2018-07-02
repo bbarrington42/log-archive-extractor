@@ -4,6 +4,8 @@ version := "0.1"
 
 scalaVersion := "2.12.6"
 
+scalacOptions ++= Seq("-feature", "-deprecation")
+
 
 // https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-s3
 libraryDependencies += "com.amazonaws" % "aws-java-sdk-s3" % "1.11.353"
