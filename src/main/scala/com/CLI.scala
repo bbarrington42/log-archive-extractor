@@ -39,24 +39,27 @@ object CLI {
   val dateTimePattern = "YYYY/MM/dd/HH"
   val formatter = DateTimeFormat.forPattern(dateTimePattern).withZoneUTC()
 
+  private def emptyOrInvalid(str: String, what: String): String =
+    if (str.isEmpty) s"Empty $what" else s"Invalid $what"
+
   // Individual validators...
   def validateDateTime(str: String): ValidationNel[String, DateTime] = \/.fromTryCatchNonFatal(
     DateTime.parse(str, formatter)
-  ).leftMap(_ => s"Invalid date/time format: $str, valid format is $dateTimePattern ").validationNel
+  ).leftMap(_ => s"${emptyOrInvalid(str, "date/time")}, format is $dateTimePattern ").validationNel
 
   def validateEnvironment(str: String): ValidationNel[String, String] =
     (if (environments.contains(str)) Success(str) else
-      Failure(s"Invalid environment: $str, should be one of ${environments.mkString(", ")}")).toValidationNel
+      Failure(s"${emptyOrInvalid(str, "environment")}, should be one of ${environments.mkString(", ")}")).toValidationNel
 
   def validateLogType(str: String): ValidationNel[String, LogType] =
     (if (logTypes.keySet.contains(str)) Success(logTypes(str)) else
-      Failure(s"Invalid log type: $str, should be one of ${logTypes.mkString(", ")}")).toValidationNel
+      Failure(s"${emptyOrInvalid(str, "log type")}, should be one of ${logTypes.keySet.mkString(", ")}")).toValidationNel
 
   def validateDestinationFile(str: String): ValidationNel[String, File] = \/.fromTryCatchNonFatal {
     val file = new File(str)
     file.createNewFile()
     file
-  }.leftMap(_ => s"Invalid file path: $str").validationNel
+  }.leftMap(_ => s"${emptyOrInvalid(str, "file path")}").validationNel
 
 
   // Does all the leg work once the parameters have been validated.
@@ -100,11 +103,33 @@ object CLI {
   type VNelT[T] = ValidationNel[String, T]
 
   // Extract log content if parameters validate.
-  def invoke(env: String, logType: String, start: String, end: String, to: String): VNelT[Unit] = {
+  private def invoke(env: String, logType: String, start: String, end: String, to: String): VNelT[Unit] = {
     Apply[VNelT].apply5(validateEnvironment(env), validateLogType(logType),
       validateDateTime(start), validateDateTime(end),
-      validateDestinationFile(to))((a, b, c, d, e) => {
-      extractLogs(s3, a, b, c, d, e)
-    })
+      validateDestinationFile(to))((a, b, c, d, e) =>
+      if (d.isAfter(c))
+        extractLogs(s3, a, b, c, d, e)
+      else Failure("Starting date must precede ending date").toValidationNel
+    )
   }
+
+  // Collect parameters
+  val params =
+    """--([A-Za-z0-9-]+)\s+([A-Za-z0-9/-]+)""".r
+
+  def command(args: Array[String]): VNelT[Unit] = {
+    val line = args.fold("")(_ + _)
+    val tuples = params.findAllMatchIn(line).map(m =>
+      if (2 == m.groupCount) (m.group(1), m.group(2)) else ("", "")).toSeq
+    val map = Map(tuples: _*).withDefaultValue("")
+    val env = map("env")
+    val logType = map("log-type")
+    val start = map("start")
+    val end = map("end")
+    val to = map("to")
+
+    invoke(env, logType, start, end, to)
+  }
+
 }
+
