@@ -32,6 +32,9 @@ object Filtering {
     override val text: String = "CONTROL_MESSAGE"
   }
 
+  val environments = Set("dev", "test", "prod-blue", "prod-green")
+  val logTypes = Set(ConsumerLog.prefix, AccessLog.prefix, DispenserLog.prefix)
+
   def isDataMessage(jsObject: JsObject): Option[Boolean] = matchMessageType(jsObject, DataMessage)
 
   def isControlMessage(jsObject: JsObject): Option[Boolean] = matchMessageType(jsObject, ControlMessage)
