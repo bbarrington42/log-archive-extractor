@@ -44,11 +44,11 @@ object Filtering {
     msgType <- jsv.asOpt[String]
   } yield msgType == messageType.text
 
-  def isAccessLog(jsObject: JsObject): Option[Boolean] = matchLogType(jsObject, AccessLog)
-
-  def isConsumerLog(jsObject: JsObject): Option[Boolean] = matchLogType(jsObject, ConsumerLog)
-
-  def isDispenserLog(jsObject: JsObject): Option[Boolean] = matchLogType(jsObject, DispenserLog)
+//  def isAccessLog(jsObject: JsObject): Option[Boolean] = matchLogType(jsObject, AccessLog)
+//
+//  def isConsumerLog(jsObject: JsObject): Option[Boolean] = matchLogType(jsObject, ConsumerLog)
+//
+//  def isDispenserLog(jsObject: JsObject): Option[Boolean] = matchLogType(jsObject, DispenserLog)
 
   def matchLogType(jsObject: JsObject, logType: LogType): Option[Boolean] = for {
     jsv <- jsObject.value.get("logGroup")
