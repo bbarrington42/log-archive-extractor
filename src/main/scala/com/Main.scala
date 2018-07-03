@@ -11,7 +11,7 @@ object Main {
     result.fold(nel => {
       println(nel.list.toList.mkString("\n"))
     }, file => {
-      println(s"Success: log entries written to ${file.getCanonicalPath}")
+      println(s"Log entries written to ${file.getCanonicalPath}")
     })
 
   }
