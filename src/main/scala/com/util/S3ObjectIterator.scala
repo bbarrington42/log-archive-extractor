@@ -36,7 +36,7 @@ class S3ObjectIterator(s3: AmazonS3, objectListing: ObjectListing) extends Itera
 
     val prefix = objectListing.getPrefix
     val sz = objectListing.getObjectSummaries.size
-    println(s"$sz objects @ $prefix")
+    println(s"$sz objects found in folder: $prefix")
 
     override def hasNext: Boolean = index < sz
 

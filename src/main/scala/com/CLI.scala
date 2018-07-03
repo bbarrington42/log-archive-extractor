@@ -9,7 +9,8 @@ import com.util.S3ObjectIterator
 import com.util.S3ObjectIterator.{asJsObjects, getContentAsString}
 import org.joda.time.DateTime
 import org.joda.time.format.DateTimeFormat
-import scalaz.{Apply, Failure, Success, ValidationNel, \/}
+import scalaz.Validation._
+import scalaz.{Apply, Failure, Success, ValidationNel}
 
 /*
   Command Line Interface for processing archived logs. Requires the following inputs:
@@ -43,9 +44,22 @@ object CLI {
     if (str.isEmpty) s"Empty $what" else s"Invalid $what"
 
   // Individual validators...
-  def validateDateTime(str: String): ValidationNel[String, DateTime] = \/.fromTryCatchNonFatal(
+  def validateDateTime(str: String): ValidationNel[String, DateTime] = fromTryCatchNonFatal(
     DateTime.parse(str, formatter)
-  ).leftMap(_ => s"${emptyOrInvalid(str, "date/time")}, format is $dateTimePattern ").validationNel
+  ).leftMap(_ => s"${emptyOrInvalid(str, "date/time")}, format is $dateTimePattern ").toValidationNel
+
+  def validateDateRange(start: String, end: String): ValidationNel[String, (DateTime, DateTime)] = {
+    val v1 = validateDateTime(start)
+    val v2 = validateDateTime(end)
+    (v1, v2) match {
+      case (Failure(e1), Failure(e2)) => Failure(e1.append(e2))
+      case (Failure(e1), Success(_)) => Failure(e1)
+      case (Success(_), Failure(e2)) => Failure(e2)
+      case (Success(d1), Success(d2)) =>
+        if (d2.isAfter(d1) || d1 == d2) Success(d1 -> d2) else
+          Failure("Ending date precedes starting date").toValidationNel
+    }
+  }
 
   def validateEnvironment(str: String): ValidationNel[String, String] =
     (if (environments.contains(str)) Success(str) else
@@ -55,15 +69,15 @@ object CLI {
     (if (logTypes.keySet.contains(str)) Success(logTypes(str)) else
       Failure(s"${emptyOrInvalid(str, "log type")}, should be one of ${logTypes.keySet.mkString(", ")}")).toValidationNel
 
-  def validateDestinationFile(str: String): ValidationNel[String, File] = \/.fromTryCatchNonFatal {
+  def validateDestinationFile(str: String): ValidationNel[String, File] = fromTryCatchNonFatal {
     val file = new File(str)
     file.createNewFile()
     file
-  }.leftMap(_ => s"${emptyOrInvalid(str, "file path")}").validationNel
+  }.leftMap(_ => s"${emptyOrInvalid(str, "file path")}").toValidationNel
 
 
   // Does all the leg work once the parameters have been validated.
-  private def extractLogs(s3: AmazonS3, env: String, logType: LogType, start: DateTime, end: DateTime, destination: File): Unit = {
+  private def extractLogs(s3: AmazonS3, env: String, logType: LogType, start: DateTime, end: DateTime, destination: File): File = {
 
     import com.util.PrefixUtil._
 
@@ -80,11 +94,14 @@ object CLI {
 
     fileWriter(destination)(
       writer => {
+        // Generate all the prefixes for the specified range. YYYY/MM/dd/HH...
         val ps = prefixes(env, start, end)
         ps.foreach(p => {
           val s3Iter = S3ObjectIterator(s3, "cda_logs", p)
+          // Iterate through all of the objects in that folder.
           while (s3Iter.hasNext) {
             val s = getContentAsString(s3Iter.next())
+            // Transform the data messages in the selected log to JSON objects.
             val jsObjects = asJsObjects(s).filter(jsObject => {
               val p = for {
                 b1 <- isDataMessage(jsObject)
@@ -93,32 +110,36 @@ object CLI {
               p.getOrElse(false)
             })
 
+            // Write the entries to a File.
             writer.write(jsObjects.mkString("\n", "\n", "\n"))
           }
         })
       }
     )
+
+    destination
   }
 
   type VNelT[T] = ValidationNel[String, T]
 
   // Extract log content if parameters validate.
-  private def invoke(env: String, logType: String, start: String, end: String, to: String): VNelT[Unit] = {
-    Apply[VNelT].apply5(validateEnvironment(env), validateLogType(logType),
-      validateDateTime(start), validateDateTime(end),
-      validateDestinationFile(to))((a, b, c, d, e) =>
-      if (d.isAfter(c))
-        extractLogs(s3, a, b, c, d, e)
-      else Failure("Starting date must precede ending date").toValidationNel
-    )
-  }
+  private def invoke(env: String, logType: String, start: String, end: String, to: String): VNelT[File] =
+    Apply[VNelT].apply4(validateEnvironment(env), validateLogType(logType),
+      validateDateRange(start, end), validateDestinationFile(to))((a, b, c, d) =>
+      extractLogs(s3, a, b, c._1, c._2, d))
 
   // Collect parameters
   val params =
-    """--([A-Za-z0-9-]+)\s+([A-Za-z0-9/-]+)""".r
+    """--([A-Za-z0-9-]+)\s+([A-Za-z0-9/.-]+)""".r
 
-  def command(args: Array[String]): VNelT[Unit] = {
-    val line = args.fold("")(_ + _)
+  def command(args: Array[String]): VNelT[File] = {
+    // Fold all of the arguments into one string.
+    // todo Is there a better way to do this?
+    val line = args.fold("")(_ + _ + " ")
+
+    println(s"line: $line")
+
+    // Build a Map containing all command line options: --env dev, --to data/logs.txt,  etc.
     val tuples = params.findAllMatchIn(line).map(m =>
       if (2 == m.groupCount) (m.group(1), m.group(2)) else ("", "")).toSeq
     val map = Map(tuples: _*).withDefaultValue("")
