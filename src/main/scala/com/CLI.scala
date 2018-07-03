@@ -133,12 +133,9 @@ object CLI {
     """--([A-Za-z0-9-]+)\s+([A-Za-z0-9/.-]+)""".r
 
   def command(args: Array[String]): VNelT[File] = {
-    // Fold all of the arguments into one string.
-    // todo Is there a better way to do this?
-    val line = args.fold("")(_ + _ + " ")
 
     // Build a Map containing all command line options: --env dev, --to data/logs.txt,  etc.
-    val tuples = params.findAllMatchIn(line).map(m =>
+    val tuples = params.findAllMatchIn(args.mkString(" ")).map(m =>
       if (2 == m.groupCount) (m.group(1), m.group(2)) else ("", "")).toSeq
     val map = Map(tuples: _*).withDefaultValue("")
     val env = map("env")
