@@ -9,8 +9,9 @@ import com.util.S3ObjectIterator
 import com.util.S3ObjectIterator.{asJsObjects, getContentAsString}
 import org.joda.time.DateTime
 import org.joda.time.format.DateTimeFormat
+import play.api.libs.json.Json
 import scalaz.Validation._
-import scalaz.{Apply, Failure, Success, ValidationNel}
+import scalaz.{Apply, Failure, NonEmptyList, Success, ValidationNel}
 
 /*
   Command Line Interface for processing archived logs. Requires the following inputs:
@@ -46,7 +47,7 @@ object CLI {
   // Individual validators...
   def validateDateTime(str: String): ValidationNel[String, DateTime] = fromTryCatchNonFatal(
     DateTime.parse(str, formatter)
-  ).leftMap(_ => s"${emptyOrInvalid(str, "date/time")}, format is $dateTimePattern ").toValidationNel
+  ).leftMap(_ => s"${emptyOrInvalid(str, s"date/time: ${str}")}, format is $dateTimePattern ").toValidationNel
 
   def validateDateRange(start: String, end: String): ValidationNel[String, (DateTime, DateTime)] = {
     val v1 = validateDateTime(start)
@@ -77,7 +78,7 @@ object CLI {
 
 
   // Does all the leg work once the parameters have been validated.
-  private def extractLogs(s3: AmazonS3, env: String, logType: LogType, start: DateTime, end: DateTime, destination: File): File = {
+  private def extractLogs(s3: AmazonS3, env: String, logType: LogType, start: DateTime, end: DateTime, destination: File): Unit = {
 
     import com.util.PrefixUtil._
 
@@ -111,32 +112,32 @@ object CLI {
             })
 
             // Write the entries to a File.
-            writer.write(jsObjects.mkString("\n", "\n", "\n"))
+            writer.write(jsObjects.map(Json.prettyPrint).mkString("\n", "\n", "\n"))
           }
         })
       }
     )
-
-    destination
   }
 
   type VNelT[T] = ValidationNel[String, T]
 
   // Extract log content if parameters validate.
-  private def invoke(env: String, logType: String, start: String, end: String, to: String): VNelT[File] =
+  private def invoke(env: String, logType: String, start: String, end: String, to: String): VNelT[Unit] =
     Apply[VNelT].apply4(validateEnvironment(env), validateLogType(logType),
       validateDateRange(start, end), validateDestinationFile(to))((a, b, c, d) =>
       extractLogs(s3, a, b, c._1, c._2, d))
 
   // Collect parameters
   val params =
-    """--([A-Za-z0-9-]+)\s+([A-Za-z0-9/.-]+)""".r
+    """--([A-Za-z0-9-]+)(\s+([A-Za-z0-9/.-]+))?""".r
 
-  def command(args: Array[String]): VNelT[File] = {
+  val usage = "Usage: extract-logs --env <environment> --log-type <log-type> --start <start-date>  --end <end-date> --to <file-name>"
+
+  def command(args: Array[String]): VNelT[Map[String, String]] = {
 
     // Build a Map containing all command line options: --env dev, --to data/logs.txt,  etc.
     val tuples = params.findAllMatchIn(args.mkString(" ")).map(m =>
-      if (2 == m.groupCount) (m.group(1), m.group(2)) else ("", "")).toSeq
+      if (3 == m.groupCount) (m.group(1), m.group(3)) else ("", "")).toSeq
     val map = Map(tuples: _*).withDefaultValue("")
     val env = map("env")
     val logType = map("log-type")
@@ -144,7 +145,9 @@ object CLI {
     val end = map("end")
     val to = map("to")
 
-    invoke(env, logType, start, end, to)
+    if (map.get("help").isDefined) Failure(NonEmptyList(usage)) else
+      invoke(env, logType, start, end, to).map(_ => map)
+
   }
 
 }

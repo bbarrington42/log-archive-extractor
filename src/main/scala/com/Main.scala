@@ -10,8 +10,8 @@ object Main {
 
     result.fold(nel => {
       println(nel.list.toList.mkString("\n"))
-    }, file => {
-      println(s"Log entries written to ${file.getCanonicalPath}")
+    }, map => {
+        println(s"Log entries written to ${map("to")}")
     })
 
   }
