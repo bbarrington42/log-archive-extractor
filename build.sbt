@@ -1,8 +1,15 @@
+import sbtassembly.AssemblyPlugin.defaultShellScript
+
 name := "log-archive-extractor"
 
 version := "0.1"
 
 scalaVersion := "2.12.6"
+
+assemblyOption in assembly := (assemblyOption in assembly).value.copy(prependShellScript = Some(defaultShellScript))
+
+assemblyJarName in assembly := "extract-logs"
+
 
 scalacOptions ++= Seq("-feature", "-deprecation")
 
