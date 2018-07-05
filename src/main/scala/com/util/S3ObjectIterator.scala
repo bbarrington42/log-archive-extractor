@@ -85,7 +85,7 @@ object S3ObjectIterator {
       } catch {
         case t: Throwable =>
           println(t)
-          jsObjects(xs)
+          Json.obj("error" -> t.getMessage) :: jsObjects(xs)
       }
     }
 
