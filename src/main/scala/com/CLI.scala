@@ -145,9 +145,9 @@ object CLI {
     val end = map("end")
     val to = map("to")
 
-    if (map.get("help").isDefined) Failure(NonEmptyList(usage)) else
+    // If 'help' is one of the command line options, return Success without executing the command.
+    if (map.contains("help")) Success(map) else
       invoke(env, logType, start, end, to).map(_ => map)
-
   }
 
 }

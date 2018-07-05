@@ -10,7 +10,9 @@ object Main {
 
     result.fold(nel => {
       println(nel.list.toList.mkString("\n"))
+      println(CLI.usage)
     }, map => {
+      if (map.contains("help")) println(CLI.usage) else
         println(s"Log entries written to ${map("to")}")
     })
 
