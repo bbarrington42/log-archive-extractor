@@ -112,7 +112,7 @@ object CLI {
             })
 
             // Write the entries to a File.
-            writer.write(jsObjects.map(Json.prettyPrint).mkString("\n", "\n", "\n"))
+            writer.write(jsObjects.map(Json.prettyPrint).mkString("\n"))
           }
         })
       }
